@@ -8,18 +8,17 @@ import { useCallback, useEffect, useState } from "react";
 import { FleetPanel } from "./FleetPanel";
 import { AlertsPanel } from "./AlertsPanel";
 import { ExpiriesPanel } from "./ExpiriesPanel";
+import { NetworkPanel } from "./NetworkPanel";
 import { HostDetailPanel } from "./HostDetailPanel";
 
 type SectionKey = "park" | "network" | "alerts" | "expiries";
 
-const SECTIONS: { key: SectionKey; label: string; path?: string }[] = [
+const SECTIONS: { key: SectionKey; label: string }[] = [
   { key: "park", label: "Парк" },
-  { key: "network", label: "Сеть", path: "/monitoring/network" },
+  { key: "network", label: "Сеть" },
   { key: "alerts", label: "Тревоги" },
   { key: "expiries", label: "Сроки" },
 ];
-
-const NATIVE: SectionKey[] = ["park", "alerts", "expiries"];
 
 export function MonitoringView() {
   const [section, setSection] = useState<SectionKey>("park");
@@ -51,8 +50,6 @@ export function MonitoringView() {
     };
   }, []);
 
-  const sectionPath = SECTIONS.find((s) => s.key === section)?.path ?? null;
-
   let body: React.ReactNode;
   if (hostId) {
     body = <HostDetailPanel agentId={hostId} onBack={() => setHostId(null)} />;
@@ -63,14 +60,7 @@ export function MonitoringView() {
   } else if (section === "expiries") {
     body = <ExpiriesPanel />;
   } else {
-    body = (
-      <iframe
-        key={sectionPath ?? "blank"}
-        src={sectionPath ?? "/monitoring/"}
-        title="Owlery — мониторинг"
-        className="h-full w-full border-0 bg-background"
-      />
-    );
+    body = <NetworkPanel />;
   }
 
   return (
