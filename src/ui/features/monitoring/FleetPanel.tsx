@@ -4,11 +4,26 @@
 // первый нативный React-экран поверх бэкенда. Cookie-сессия Termix уходит
 // same-origin, Caddy forward-auth пускает на хаб.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { getSSHHosts, type SSHHostWithStatus } from "@/main-axios";
 
 const FLEET_URL = "/monitoring/api/fleet";
 const REFRESH_MS = 10_000;
+
+// Сессия-в-клик: открыть SSH/RDP-сессию Termix к хосту (событие слушает AppShell).
+function openSession(hostId: string | number, type: "terminal" | "rdp") {
+  window.dispatchEvent(
+    new CustomEvent("termix:open-tab", {
+      detail: { hostId: String(hostId), type },
+    }),
+  );
+}
+
+// Мониторинговый хост ↔ хост Termix: матч по имени/hostname/IP (без .local, регистр не важен).
+function normalizeName(s: string): string {
+  return s.toLowerCase().replace(/\.local$/, "").trim();
+}
 
 interface HostTile {
   agent_id: string;
@@ -57,19 +72,35 @@ function MetricBar({ label, value }: { label: string; value: number | null }) {
   );
 }
 
-function HostCard({
-  host,
-  onOpen,
+function SessionButton({
+  label,
+  onClick,
 }: {
-  host: HostTile;
-  onOpen?: (agentId: string) => void;
+  label: string;
+  onClick: () => void;
 }) {
   return (
     <button
       type="button"
-      onClick={() => onOpen?.(host.agent_id)}
-      className="flex flex-col rounded-lg border border-border bg-card px-3.5 py-3 text-left transition-colors hover:border-accent-brand/60"
+      onClick={onClick}
+      className="rounded border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-accent-brand/60 hover:text-accent-brand"
     >
+      {label}
+    </button>
+  );
+}
+
+function HostCard({
+  host,
+  termixHost,
+  onOpen,
+}: {
+  host: HostTile;
+  termixHost?: SSHHostWithStatus;
+  onOpen?: (agentId: string) => void;
+}) {
+  return (
+    <div className="flex flex-col rounded-lg border border-border bg-card px-3.5 py-3 transition-colors hover:border-border/80">
       <div className="mb-1.5 flex items-center gap-2">
         <span
           className={`size-2 shrink-0 rounded-full ${
@@ -78,9 +109,13 @@ function HostCard({
               : "bg-muted-foreground/40"
           }`}
         />
-        <span className="truncate font-semibold text-foreground">
+        <button
+          type="button"
+          onClick={() => onOpen?.(host.agent_id)}
+          className="truncate text-left font-semibold text-foreground hover:text-accent-brand"
+        >
           {host.agent_id}
-        </span>
+        </button>
         <span className="ml-auto truncate text-xs text-muted-foreground">
           {host.os} {host.os_version}
         </span>
@@ -88,11 +123,29 @@ function HostCard({
       <MetricBar label="CPU" value={host.cpu} />
       <MetricBar label="RAM" value={host.mem} />
       <MetricBar label="Диск" value={host.disk} />
-      <div className="mt-1.5 truncate text-[11px] text-muted-foreground">
-        {host.hostname || "—"} ·{" "}
-        {host.online ? `онлайн ${host.ago}s назад` : `офлайн ${host.ago}s`}
+      <div className="mt-2 flex items-center gap-2">
+        <span className="flex-1 truncate text-[11px] text-muted-foreground">
+          {host.hostname || "—"} ·{" "}
+          {host.online ? `онлайн ${host.ago}s назад` : `офлайн ${host.ago}s`}
+        </span>
+        {termixHost ? (
+          <div className="flex shrink-0 gap-1">
+            {termixHost.enableSsh !== false && (
+              <SessionButton
+                label="SSH"
+                onClick={() => openSession(termixHost.id, "terminal")}
+              />
+            )}
+            {termixHost.enableRdp && (
+              <SessionButton
+                label="RDP"
+                onClick={() => openSession(termixHost.id, "rdp")}
+              />
+            )}
+          </div>
+        ) : null}
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -104,6 +157,7 @@ export function FleetPanel({
   const { t } = useTranslation();
   const [fleet, setFleet] = useState<Fleet | null>(null);
   const [error, setError] = useState(false);
+  const [termixHosts, setTermixHosts] = useState<SSHHostWithStatus[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -121,6 +175,40 @@ export function FleetPanel({
     const id = setInterval(() => void load(), REFRESH_MS);
     return () => clearInterval(id);
   }, [load]);
+
+  // Хосты Termix (для сессии-в-клик). Обновляем при изменениях в разделе Hosts.
+  useEffect(() => {
+    const loadHosts = () =>
+      getSSHHosts()
+        .then(setTermixHosts)
+        .catch(() => setTermixHosts([]));
+    void loadHosts();
+    window.addEventListener("termix:hosts-changed", loadHosts);
+    window.addEventListener("ssh-hosts:changed", loadHosts);
+    return () => {
+      window.removeEventListener("termix:hosts-changed", loadHosts);
+      window.removeEventListener("ssh-hosts:changed", loadHosts);
+    };
+  }, []);
+
+  // Индекс хостов Termix по нормализованному имени и IP — для матча с парком.
+  const termixByKey = useMemo(() => {
+    const map = new Map<string, SSHHostWithStatus>();
+    for (const h of termixHosts) {
+      if (h.name) map.set(normalizeName(h.name), h);
+      if (h.ip) map.set(normalizeName(h.ip), h);
+    }
+    return map;
+  }, [termixHosts]);
+
+  const matchTermix = useCallback(
+    (tile: HostTile): SSHHostWithStatus | undefined =>
+      termixByKey.get(normalizeName(tile.agent_id)) ??
+      (tile.hostname
+        ? termixByKey.get(normalizeName(tile.hostname))
+        : undefined),
+    [termixByKey],
+  );
 
   if (fleet == null) {
     return (
@@ -164,6 +252,7 @@ export function FleetPanel({
                 <HostCard
                   key={host.agent_id}
                   host={host}
+                  termixHost={matchTermix(host)}
                   onOpen={onOpenHost}
                 />
               ))}
