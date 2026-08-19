@@ -1,39 +1,37 @@
 // --- owlery ---
-// Оболочка раздела «Мониторинг» (Фаза C). Даёт бренд + секц-навигацию и
-// содержимое: «Парк» и «Тревоги» — нативный React (над hub JSON-API), «Сеть»/
-// «Сроки» и деталь хоста — пока iframe хаба под /monitoring (у страниц хаба во
-// встроенном режиме скрыт свой <header> — навигацию даёт эта оболочка). По мере
-// Фазы C секции переезжают на нативный React по одной.
+// Оболочка раздела «Мониторинг» (Фаза C). Бренд + секц-навигация и содержимое:
+// «Парк»/«Тревоги»/«Сроки» и деталь хоста — нативный React (над hub JSON-API),
+// «Сеть» — пока iframe хаба под /monitoring (у страниц хаба во встроенном режиме
+// скрыт свой <header> — навигацию даёт эта оболочка).
 
 import { useCallback, useEffect, useState } from "react";
 import { FleetPanel } from "./FleetPanel";
 import { AlertsPanel } from "./AlertsPanel";
 import { ExpiriesPanel } from "./ExpiriesPanel";
+import { HostDetailPanel } from "./HostDetailPanel";
 
 type SectionKey = "park" | "network" | "alerts" | "expiries";
 
 const SECTIONS: { key: SectionKey; label: string; path?: string }[] = [
   { key: "park", label: "Парк" },
   { key: "network", label: "Сеть", path: "/monitoring/network" },
-  { key: "alerts", label: "Тревоги" }, // нативная панель, без iframe-пути
-  { key: "expiries", label: "Сроки" }, // нативная панель, без iframe-пути
+  { key: "alerts", label: "Тревоги" },
+  { key: "expiries", label: "Сроки" },
 ];
 
 const NATIVE: SectionKey[] = ["park", "alerts", "expiries"];
 
 export function MonitoringView() {
   const [section, setSection] = useState<SectionKey>("park");
-  // Непустой = показываем iframe детали хоста (открыт кликом из «Парка»/«Тревог»).
-  const [hostPath, setHostPath] = useState<string | null>(null);
+  // Непустой = нативная деталь конкретного хоста (открыта из «Парка»/«Тревог»).
+  const [hostId, setHostId] = useState<string | null>(null);
   const [alertCount, setAlertCount] = useState<number>(0);
 
   const selectSection = (key: SectionKey) => {
     setSection(key);
-    setHostPath(null);
+    setHostId(null);
   };
-  const openHostDetail = useCallback((id: string) => {
-    setHostPath(`/monitoring/host/${encodeURIComponent(id)}`);
-  }, []);
+  const openHostDetail = useCallback((id: string) => setHostId(id), []);
 
   // Счётчик активных тревог для бейджа на пункте «Тревоги» (виден всегда).
   useEffect(() => {
@@ -54,7 +52,26 @@ export function MonitoringView() {
   }, []);
 
   const sectionPath = SECTIONS.find((s) => s.key === section)?.path ?? null;
-  const showNative = hostPath == null && NATIVE.includes(section);
+
+  let body: React.ReactNode;
+  if (hostId) {
+    body = <HostDetailPanel agentId={hostId} onBack={() => setHostId(null)} />;
+  } else if (section === "park") {
+    body = <FleetPanel onOpenHost={openHostDetail} />;
+  } else if (section === "alerts") {
+    body = <AlertsPanel onOpenHost={openHostDetail} />;
+  } else if (section === "expiries") {
+    body = <ExpiriesPanel />;
+  } else {
+    body = (
+      <iframe
+        key={sectionPath ?? "blank"}
+        src={sectionPath ?? "/monitoring/"}
+        title="Owlery — мониторинг"
+        className="h-full w-full border-0 bg-background"
+      />
+    );
+  }
 
   return (
     <div className="flex h-full w-full flex-col bg-background">
@@ -63,7 +80,7 @@ export function MonitoringView() {
         <span className="text-xs text-muted-foreground">пульт парка</span>
         <nav className="ml-auto flex items-center gap-1">
           {SECTIONS.map((s) => {
-            const active = section === s.key && !hostPath;
+            const active = section === s.key && !hostId;
             return (
               <button
                 key={s.key}
@@ -87,23 +104,7 @@ export function MonitoringView() {
         </nav>
       </header>
 
-      <div className="min-h-0 flex-1">
-        {showNative && section === "park" ? (
-          <FleetPanel onOpenHost={openHostDetail} />
-        ) : showNative && section === "alerts" ? (
-          <AlertsPanel onOpenHost={openHostDetail} />
-        ) : showNative && section === "expiries" ? (
-          <ExpiriesPanel />
-        ) : (
-          <iframe
-            // key по пути: смена секции перезагружает iframe на нужную страницу
-            key={hostPath ?? sectionPath ?? "blank"}
-            src={hostPath ?? sectionPath ?? "/monitoring/"}
-            title="Owlery — мониторинг"
-            className="h-full w-full border-0 bg-background"
-          />
-        )}
-      </div>
+      <div className="min-h-0 flex-1">{body}</div>
     </div>
   );
 }
