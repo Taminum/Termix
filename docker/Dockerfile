@@ -56,10 +56,12 @@ RUN npm ci --omit=dev --ignore-scripts && \
 FROM node:26-slim
 WORKDIR /app
 
+# --- owlery --- НЕ зашиваем чужой ключ телеметрии апстрима (PostHog).
+# Форк не шлёт статистику: без POSTHOG_API_KEY бэкенд-хартбит сразу выходит,
+# плюс в compose задан ENABLE_TELEMETRY=false как явный жёсткий оверрайд.
 ENV DATA_DIR=/app/data \
     PORT=8080 \
-    NODE_ENV=production \
-    POSTHOG_API_KEY=phc_xM8UznirsFxUkGE68gH4jzeqevf4kh76wGw7Ci7hH2dd
+    NODE_ENV=production
 
 RUN apt-get update && apt-get install -y nginx gettext-base openssl ca-certificates gosu wget certbot python3-certbot-dns-cloudflare && \
     update-ca-certificates && \
