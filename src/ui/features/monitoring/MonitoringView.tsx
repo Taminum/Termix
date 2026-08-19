@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { FleetPanel } from "./FleetPanel";
 import { AlertsPanel } from "./AlertsPanel";
+import { ExpiriesPanel } from "./ExpiriesPanel";
 
 type SectionKey = "park" | "network" | "alerts" | "expiries";
 
@@ -15,10 +16,10 @@ const SECTIONS: { key: SectionKey; label: string; path?: string }[] = [
   { key: "park", label: "Парк" },
   { key: "network", label: "Сеть", path: "/monitoring/network" },
   { key: "alerts", label: "Тревоги" }, // нативная панель, без iframe-пути
-  { key: "expiries", label: "Сроки", path: "/monitoring/expiries" },
+  { key: "expiries", label: "Сроки" }, // нативная панель, без iframe-пути
 ];
 
-const NATIVE: SectionKey[] = ["park", "alerts"];
+const NATIVE: SectionKey[] = ["park", "alerts", "expiries"];
 
 export function MonitoringView() {
   const [section, setSection] = useState<SectionKey>("park");
@@ -91,6 +92,8 @@ export function MonitoringView() {
           <FleetPanel onOpenHost={openHostDetail} />
         ) : showNative && section === "alerts" ? (
           <AlertsPanel onOpenHost={openHostDetail} />
+        ) : showNative && section === "expiries" ? (
+          <ExpiriesPanel />
         ) : (
           <iframe
             // key по пути: смена секции перезагружает iframe на нужную страницу
