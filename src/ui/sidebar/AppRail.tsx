@@ -5,6 +5,7 @@ import {
   Check,
   Clock,
   Fingerprint,
+  Gauge,
   Hammer,
   KeyRound,
   LayoutPanelLeft,
@@ -60,6 +61,14 @@ function buildRailButtons(
   hidden: Set<string>,
 ): RailItem[] {
   const all: RailItem[] = [
+    // --- owlery --- флагманская поверхность: дашборд мониторинга (iframe хаба)
+    {
+      kind: "tab",
+      tabType: "monitoring" as TabType,
+      icon: <Gauge size={16} />,
+      title: t("nav.monitoring"),
+    },
+    { kind: "separator" },
     { view: "hosts", icon: <Server size={16} />, title: t("nav.hosts") },
     {
       view: "credentials",

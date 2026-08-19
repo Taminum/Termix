@@ -2,6 +2,7 @@
 import {
   Box,
   FolderSearch,
+  Gauge, // --- owlery ---
   LayoutDashboard,
   LayoutGrid,
   Monitor,
@@ -87,6 +88,12 @@ const TunnelTab = lazy(() =>
 const NetworkGraphCard = lazy(() =>
   import("@/dashboard/cards/NetworkGraphCard").then((m) => ({
     default: m.NetworkGraphCard,
+  })),
+);
+// --- owlery --- встроенный дашборд мониторинга (iframe хаба под /monitoring)
+const MonitoringTab = lazy(() =>
+  import("@/features/monitoring/MonitoringTab").then((m) => ({
+    default: m.MonitoringTab,
   })),
 );
 const Serial = lazy(() =>
@@ -190,6 +197,9 @@ export function tabIcon(type: TabType) {
       return <Network className="size-3.5" />;
     case "network_graph":
       return <Network className="size-3.5" />;
+    // --- owlery ---
+    case "monitoring":
+      return <Gauge className="size-3.5" />;
     // --- tmux-monitor ---
     case "tmux_monitor":
       return <Layers className="size-3.5" />;
@@ -398,6 +408,10 @@ export function renderTabContent(
       return withTabSuspense(
         <NetworkGraphCard embedded={false} isVisible={isVisible} />,
       );
+
+    // --- owlery --- дашборд мониторинга Owlery, встроенный iframe'ом
+    case "monitoring":
+      return withTabSuspense(<MonitoringTab />);
 
     // --- tmux-monitor ---
     case "tmux_monitor":

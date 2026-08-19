@@ -1295,6 +1295,7 @@ export function AppShell({
         docker: t("nav.docker"),
         tunnel: t("nav.tunnels"),
         network_graph: t("nav.networkGraph"),
+        monitoring: t("nav.monitoring"), // --- owlery ---
         tmux_monitor: t("nav.tmuxMonitor"), // --- tmux-monitor ---
         homepage: t("nav.homepage"),
       };

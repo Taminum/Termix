@@ -254,6 +254,7 @@ export type TabType =
   | "network_graph"
   | "tmux_monitor" // --- tmux-monitor ---
   | "serial"
+  | "monitoring" // --- owlery --- встроенный дашборд мониторинга (iframe /monitoring)
   | "homepage";
 
 export type SerialConfig = {
