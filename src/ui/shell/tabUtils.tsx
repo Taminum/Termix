@@ -90,10 +90,10 @@ const NetworkGraphCard = lazy(() =>
     default: m.NetworkGraphCard,
   })),
 );
-// --- owlery --- встроенный дашборд мониторинга (iframe хаба под /monitoring)
-const MonitoringTab = lazy(() =>
-  import("@/features/monitoring/MonitoringTab").then((m) => ({
-    default: m.MonitoringTab,
+// --- owlery --- раздел «Мониторинг»: нативный «Парк» + iframe остальных экранов
+const MonitoringView = lazy(() =>
+  import("@/features/monitoring/MonitoringView").then((m) => ({
+    default: m.MonitoringView,
   })),
 );
 const Serial = lazy(() =>
@@ -409,9 +409,9 @@ export function renderTabContent(
         <NetworkGraphCard embedded={false} isVisible={isVisible} />,
       );
 
-    // --- owlery --- дашборд мониторинга Owlery, встроенный iframe'ом
+    // --- owlery --- раздел мониторинга Owlery (нативный «Парк» + iframe секции)
     case "monitoring":
-      return withTabSuspense(<MonitoringTab />);
+      return withTabSuspense(<MonitoringView />);
 
     // --- tmux-monitor ---
     case "tmux_monitor":
