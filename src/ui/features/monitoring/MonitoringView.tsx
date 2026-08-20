@@ -9,15 +9,17 @@ import { FleetPanel } from "./FleetPanel";
 import { AlertsPanel } from "./AlertsPanel";
 import { ExpiriesPanel } from "./ExpiriesPanel";
 import { NetworkPanel } from "./NetworkPanel";
+import { ReportPanel } from "./ReportPanel";
 import { HostDetailPanel } from "./HostDetailPanel";
 
-type SectionKey = "park" | "network" | "alerts" | "expiries";
+type SectionKey = "park" | "network" | "alerts" | "expiries" | "report";
 
 const SECTIONS: { key: SectionKey; label: string }[] = [
   { key: "park", label: "Парк" },
   { key: "network", label: "Сеть" },
   { key: "alerts", label: "Тревоги" },
   { key: "expiries", label: "Сроки" },
+  { key: "report", label: "Отчёт" },
 ];
 
 export function MonitoringView() {
@@ -59,6 +61,8 @@ export function MonitoringView() {
     body = <AlertsPanel onOpenHost={openHostDetail} />;
   } else if (section === "expiries") {
     body = <ExpiriesPanel />;
+  } else if (section === "report") {
+    body = <ReportPanel />;
   } else {
     body = <NetworkPanel />;
   }
