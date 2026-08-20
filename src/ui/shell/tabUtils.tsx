@@ -28,6 +28,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import type { Tab, TabType, Host } from "@/types/ui-types";
 import type { SSHHost } from "@/types";
 import { useTabsSafe } from "@/shell/TabContext";
+import { InstallAgentButton } from "@/features/monitoring/InstallAgentButton"; // --- owlery ---
 
 // Heavy tab surfaces — keep out of the AppShell critical path.
 const CommandHistoryProvider = lazy(() =>
@@ -236,7 +237,18 @@ function TerminalTabContent({
   return withTabSuspense(
     <CommandHistoryProvider>
       <div className="flex flex-col h-full w-full">
-        <div className="flex-1 min-h-0">
+        <div className="relative flex-1 min-h-0">
+          {/* --- owlery --- установка агента в один клик (сохранённые SSH-хосты) */}
+          {host.id && !/^(quick-connect|serial)-/.test(host.id) && (
+            <div className="pointer-events-none absolute right-2 top-2 z-20">
+              <InstallAgentButton
+                host={host}
+                terminalRef={
+                  tab.terminalRef as React.RefObject<TerminalHandle | null>
+                }
+              />
+            </div>
+          )}
           <TerminalFeature
             ref={tab.terminalRef as React.Ref<TerminalHandle>}
             hostConfig={
