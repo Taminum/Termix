@@ -47,11 +47,27 @@ export function InstallAgentButton({
         const d = await r.json().catch(() => ({}));
         throw new Error(d.detail || `HTTP ${r.status}`);
       }
-      const { install_cmd } = (await r.json()) as { install_cmd: string };
+      const { install_cmd, install_cmd_win } = (await r.json()) as {
+        install_cmd: string;
+        install_cmd_win?: string;
+      };
       const term = terminalRef?.current;
-      if (!term?.sendInput) throw new Error("нет доступа к терминалу");
-      term.sendInput(install_cmd + "\n");
-      toast.success("Устанавливаю агент — смотри вывод в терминале");
+      if (term?.sendInput) {
+        // Linux SSH-сессия: льём команду прямо в терминал. Windows-команду кладём
+        // в буфер — если хост окажется Windows, оператор вставит её в PowerShell.
+        term.sendInput(install_cmd + "\n");
+        if (install_cmd_win)
+          await navigator.clipboard?.writeText(install_cmd_win).catch(() => {});
+        toast.success(
+          "Linux: команда пошла в сессию. Windows: команда в буфере (PowerShell от админа).",
+        );
+      } else {
+        // Нет терминала (напр. RDP) — копируем обе команды в буфер.
+        const text =
+          `# Linux:\n${install_cmd}\n\n# Windows (PowerShell от админа):\n${install_cmd_win ?? "—"}`;
+        await navigator.clipboard?.writeText(text).catch(() => {});
+        toast.success("Команды установки скопированы в буфер");
+      }
     } catch (e) {
       toast.error("Установка агента: " + (e as Error).message);
     } finally {
