@@ -21,6 +21,7 @@ interface ScanRow {
   org: string;
   router: Router;
   devices: number;
+  new: number; // Фаза E: сколько новых/rogue устройств
   ago: number;
 }
 interface Device {
@@ -29,6 +30,17 @@ interface Device {
   hostname?: string;
   source: string;
   dynamic?: boolean;
+  new?: boolean; // Фаза E: недавно появившийся MAC
+}
+interface Change {
+  id: number;
+  agent_id: string;
+  org: string;
+  ts: number;
+  kind: string; // new | gone
+  mac: string;
+  ip: string;
+  hostname: string;
 }
 interface Neighbor {
   interface: string;
@@ -162,8 +174,26 @@ function NetworkDetail({
           </thead>
           <tbody>
             {scan.devices.map((d, i) => (
-              <tr key={i} className="border-t border-border">
-                <td className="px-2 py-1 tabular-nums">{d.ip}</td>
+              <tr
+                key={i}
+                className="border-t border-border"
+                style={
+                  d.new
+                    ? { background: "color-mix(in srgb, var(--crit, #f85149) 8%, transparent)" }
+                    : undefined
+                }
+              >
+                <td className="px-2 py-1 tabular-nums">
+                  {d.ip}
+                  {d.new && (
+                    <span
+                      className="ml-2 rounded px-1 py-0.5 text-[10px] font-semibold text-white"
+                      style={{ background: "var(--crit, #f85149)" }}
+                    >
+                      новое
+                    </span>
+                  )}
+                </td>
                 <td className="px-2 py-1 text-muted-foreground">{d.mac}</td>
                 <td className="px-2 py-1">{d.hostname || "—"}</td>
                 <td className="px-2 py-1 text-muted-foreground">
@@ -213,16 +243,30 @@ function NetworkDetail({
   );
 }
 
+function timeAgo(sec: number): string {
+  if (sec < 90) return `${sec}s назад`;
+  if (sec < 5400) return `${Math.round(sec / 60)} мин назад`;
+  if (sec < 172800) return `${Math.round(sec / 3600)} ч назад`;
+  return `${Math.round(sec / 86400)} дн назад`;
+}
+
 export function NetworkPanel() {
   const [rows, setRows] = useState<ScanRow[] | null>(null);
+  const [changes, setChanges] = useState<Change[]>([]);
+  const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
   const [error, setError] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch(API, { credentials: "same-origin" });
-      if (!r.ok) throw new Error(String(r.status));
-      setRows((await r.json()) as ScanRow[]);
+      const [rr, cr] = await Promise.all([
+        fetch(API, { credentials: "same-origin" }),
+        fetch("/monitoring/api/changes", { credentials: "same-origin" }),
+      ]);
+      if (!rr.ok) throw new Error(String(rr.status));
+      setRows((await rr.json()) as ScanRow[]);
+      setChanges(cr.ok ? ((await cr.json()) as Change[]) : []);
+      setNowSec(Math.floor(Date.now() / 1000));
       setError(false);
     } catch {
       setError(true);
@@ -269,6 +313,40 @@ export function NetworkPanel() {
 
   return (
     <div className="h-full w-full overflow-y-auto px-5 py-4">
+      {changes.length > 0 && (
+        <section className="mb-6">
+          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
+            Недавние изменения
+            <span
+              className="rounded-full px-1.5 text-[10px] font-bold text-white"
+              style={{ background: "var(--crit, #f85149)" }}
+            >
+              {changes.length}
+            </span>
+          </h3>
+          <div className="flex flex-col gap-1.5">
+            {changes.slice(0, 8).map((c) => (
+              <div
+                key={c.id}
+                className="rounded-lg border border-border bg-card px-3 py-2 text-sm"
+                style={{
+                  borderLeftWidth: 3,
+                  borderLeftColor: "var(--crit, #f85149)",
+                }}
+              >
+                <span className="font-semibold text-foreground">
+                  Новое устройство
+                </span>{" "}
+                <span className="text-muted-foreground">
+                  {c.hostname || c.ip || c.mac} ({c.mac}) · {c.org} · агент{" "}
+                  {c.agent_id} · {timeAgo(nowSec - c.ts)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
         {rows.map((r) => (
           <button
@@ -281,6 +359,14 @@ export function NetworkPanel() {
               <span className="truncate font-semibold text-foreground">
                 {r.router.identity || r.agent_id}
               </span>
+              {r.new > 0 && (
+                <span
+                  className="rounded-full px-1.5 text-[10px] font-bold text-white"
+                  style={{ background: "var(--crit, #f85149)" }}
+                >
+                  +{r.new}
+                </span>
+              )}
               <span className="ml-auto truncate text-xs text-muted-foreground">
                 {r.org}
               </span>
